@@ -1,0 +1,591 @@
+\documentclass[12pt,a4paper,twoside]{book}
+
+% Remove footnote line
+\renewcommand{\footnoterule}{}
+\usepackage{pre}
+
+%%% TITLE PAGE %%%
+
+\title
+    {
+    \vspace{-2.5cm}
+        {\includegraphics[width=.215\textwidth]{figs/PWrLogo.eps}} \par \vspace{1ex} \large{WROCŁAW UNIVERSITY OF SCIENCE AND TECHNOLOGY} 
+	\par \vspace{1ex}
+	{\scshape\large Faculty of Fundamental Problems of Technology\par}
+	\vspace{2cm}
+    {Bachelor thesis\par}  % Preserve either Bachelor or Master, not both.
+    \vspace{2cm}
+	{\Large{\bf Clinical decision support system for renal dose adjustment based on Summary of Product Characteristics}}
+    }
+    
+\author
+    {
+    \vspace{1cm}
+    Author: Tsimur Halkin\\
+    Supervisor: dr hab. inż. Sebastian Kraszewski
+    }
+\date{\vfill Wrocław~2026}
+
+%%% BEGINNING OF THE THESIS %%%
+
+\begin{document}
+
+\maketitle
+
+\afterpage{\blankpage}\clearpage
+
+\begin{flushright}
+    \thispagestyle{empty}
+    \vspace*{\fill}
+    
+    {\em To my \dots}  % parents etc.
+    % \vspace*{\fill}
+\end{flushright}
+
+\afterpage{\blankpage}\clearpage
+
+{
+  \hypersetup{linkcolor=black}
+  \tableofcontents
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% IT IS GOOD TO WRITE EACH SENTENCE IN A SEPARATE LINE,
+% BECAUSE THIS HELPS FIND A PARTICULAR SENTENCE BY SIMPLY
+% EYE-SCANNING THE LEFT EDGE OF THE .TEX FILE.
+% IT IS ALSO EASY TO SWITCH ON/OFF A PARTICULAR SENTENCE BY COMMENTING IT OUT.
+% BESIDES, IN REAL-TIME DISCUSSIONS ONE CAN REFER TO 
+% A PARTICULAR SENTENCE BY A SPECIFIC LINE OF THE .TEX FILE.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Introduction}\label{ch:intro}
+
+\section{Project Background and Motivation}\label{sec:background-motivation}
+
+Renal impairment can significantly change how drugs are handled by the body. 
+For some medicines, reduced kidney function may require a lower dose, a longer dosing interval, additional monitoring, or even avoiding the drug. 
+In everyday clinical work, this information is usually checked manually in Summary of Product Characteristics .
+
+These documents are official and reliable, but they are not convenient for automatic use. 
+They are usually available as PDF files, and relevant information may be spread across different sections, such as dosage, contraindications, warnings, and pharmacokinetics. 
+This makes renal dose checking repetitive and time-consuming, especially when a patient receives several drugs at the same time.
+
+This project was motivated by the idea that official drug information can be organized into a structured knowledge base and used by a software system to support renal dose adjustment. 
+The goal is not to replace clinical judgement, but to make the lookup process more transparent, consistent, and easier to review.
+
+\section{Goal of the Thesis}\label{sec:goal-thesis}
+
+This thesis presents the design and implementation of a prototype clinical decision support system for renal dose adjustment. 
+The system uses structured rules derived from Summary of Product Characteristics documents and applies them to basic patient data and a medication list.
+
+The main goal is to generate explainable recommendations based on validated rules. 
+For each drug, the system should indicate whether standard dosing can be used, whether dose adjustment or monitoring is needed, whether the drug should be avoided, or whether manual review is required. 
+Each recommendation should also point to the source document and section from which the rule was derived.
+
+The final recommendation is produced by a deterministic rule-based engine. 
+AI may be used as a \textbf{helper} for extracting candidate rules from ChPL documents, but it does not directly decide the final recommendation.
+
+
+\section{Problem Statement}\label{sec:problem-statement}
+
+Information about renal dose adjustment is available in official Summary of Product Characteristics%
+\footnote{In Poland, the Summary of Product Characteristics is known as \textit{Charakterystyka Produktu Leczniczego} (ChPL). It is an official document describing the approved conditions of use of a medicinal product, including dosage, contraindications, warnings, and pharmacological properties.}, 
+but it is not provided in a structured form suitable for automatic decision support.
+
+For each drug, the relevant information may appear in different sections of the document, including dosage, contraindications, warnings, and pharmacokinetic properties. 
+Moreover, recommendations may depend on the route of administration, pharmaceutical form, renal function threshold, or the presence of severe renal impairment.
+
+The central problem addressed in this thesis is the transformation of textual drug information from ChPL documents into structured, validated decision rules that can be used by a software system. 
+The system must be able to calculate renal function, match the calculated value with appropriate rules, and present the result in an explainable way. 
+If a reliable rule is not available, the system should avoid guessing and indicate that manual clinical review is required.
+
+Therefore, the project combines three technical challenges: extraction and organization of information from official product documents, representation of renal dosing knowledge in a database, and deterministic rule-based generation of recommendations.
+
+\section{Project Assumptions}\label{sec:project-assumptions}
+
+The project is based on several assumptions that define the intended use and technical boundaries of the prototype. 
+First, Summary of Product Characteristics documents are treated as the primary source of drug dosing information. 
+Only information derived from these documents is used to create renal dosing rules stored in the system knowledge base.
+
+Second, the final recommendation is generated by a deterministic rule-based engine. 
+The system does not allow an AI model to directly decide the dose or override validated rules. 
+AI may be used only as a helper for processing ChPL documents and suggesting candidate rules, which must be reviewed before they become active in the system.
+
+Third, the prototype uses a limited set of selected drugs instead of attempting to cover all medicines available in clinical practice. 
+The selected drugs are used to demonstrate the complete workflow: document analysis, rule creation, renal function calculation, rule matching, and recommendation generation.
+
+Fourth, the system works with synthetic patient data only. 
+The prototype is not connected to hospital systems, electronic health records, or real clinical databases. 
+Patient parameters are entered manually in order to test the decision workflow in a controlled environment.
+
+Fifth, the system assumes that renal dose adjustment can be represented as structured rules based on renal function thresholds, recommendation types, and source references. 
+If no validated rule is available for a given drug, route, or renal function range, the system should not guess the recommendation and should instead indicate that manual review is required.
+
+Finally, the prototype is designed as an academic and engineering demonstration. 
+It is not intended for real clinical use, does not replace the judgement of a physician or pharmacist, and is not certified as medical device software.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Background}
+\section{Renal Dose Adjustment}
+\label{sec:renal-dose-adjustment}
+
+Renal dose adjustment is the modification of drug therapy according to the patient's kidney function. 
+It is necessary because impaired renal function can reduce the elimination of drugs or active metabolites and increase the risk of toxicity. 
+Depending on the medicine, renal impairment may require a lower dose, a longer dosing interval, additional monitoring, avoidance of the drug, or manual clinical review. 
+The need for adjustment depends not only on the degree of renal impairment, but also on drug-specific factors, such as the fraction eliminated by the kidneys, the presence of active metabolites, the therapeutic index, and the risk of adverse effects~\cite{artDooguePolasek2011DrugDosingRenalDisease,artStefani2019AdjustDrugDosesCKD}.
+
+A key technical problem in renal dose adjustment is the estimation of kidney function. 
+Historically, creatinine clearance has often been estimated using the Cockcroft--Gault equation, which uses age, body weight, sex, and serum creatinine~\cite{artCockcroftGault1976}. 
+Although modern clinical practice often reports estimated glomerular filtration rate (eGFR), drug dosing recommendations and prescribing information have frequently been based on creatinine clearance thresholds~\cite{artDowling2010RenalDrugDosing,artJones2011RenalFunctionDrugDosing}. 
+For this reason, the prototype treats renal function calculation as a separate module and uses established formulas instead of developing a new clinical model.
+
+The Cockcroft--Gault equation estimates creatinine clearance as follows:
+
+\begin{equation}
+CrCl =
+\frac{(140 - age) \cdot weight}{72 \cdot SCr}
+\end{equation}
+
+where \(CrCl\) is creatinine clearance in ml/min, \(age\) is given in years, \(weight\) in kilograms, and \(SCr\) is serum creatinine in mg/dl. 
+For female patients, the result is multiplied by 0.85:
+
+\begin{equation}
+CrCl_{female} = CrCl \cdot 0.85
+\end{equation}
+
+If serum creatinine is provided in \(\mu mol/l\), it is converted to mg/dl before applying the formula:
+
+\begin{equation}
+SCr_{mg/dl} = \frac{SCr_{\mu mol/l}}{88.4}
+\end{equation}
+
+The choice of renal function estimate may affect dosing decisions. 
+Several publications discuss differences between creatinine clearance and eGFR-based approaches for medication dosing and show that these values should not always be treated as interchangeable~\cite{artStevens2009DrugDosingRecommendations,artHudsonNolin2018KidneyFunctionDrugDosing}. 
+Therefore, the system stores the renal function metric used by each dosing rule and does not assume that every recommendation can be applied to every renal function estimate.
+
+From the perspective of this project, renal dose adjustment is represented as a rule-matching problem. 
+A rule connects a drug product, route of administration, renal function metric, renal function range, recommendation type, and source reference. 
+The decision engine calculates renal function, searches for a matching validated rule, and returns an explainable recommendation. 
+If no validated rule is available, the system returns a manual review recommendation instead of guessing.
+
+\section{Summary of Product Characteristics as a Data Source}
+\label{sec:smpc-data-source}
+
+The Summary of Product Characteristics (SmPC), known in Poland as \textit{Charakterystyka Produktu Leczniczego} (ChPL), is an official document describing the approved conditions of use of a medicinal product. 
+According to the European Medicines Agency, the SmPC is the basis of information for healthcare professionals on how to use a medicine safely and effectively~\cite{miscEMASmPC}. 
+For this reason, ChPL documents are a natural source of knowledge for a system that supports drug dosing decisions.
+
+The structure of an SmPC is standardized. 
+For renal dose adjustment, the most relevant parts are usually section 4.2, which describes posology and method of administration, section 4.3, which lists contraindications, section 4.4, which contains special warnings and precautions, and section 5.2, which describes pharmacokinetic properties. 
+The European Commission guideline on SmPC presentation describes the expected structure and principles for presenting information in these documents~\cite{miscEuropeanCommissionSmPCGuideline}. 
+In practice, renal impairment may be mentioned in more than one section, for example as a precise dose adjustment table in section 4.2, as a warning in section 4.4, or as information about renal elimination in section 5.2.
+
+In Poland, information about authorised medicinal products is available through the official Rejestr Produktów Leczniczych. 
+The register contains information about medicinal products authorised for use in Poland, and its public data files may include links to product leaflets and ChPL documents~\cite{miscURPLRPL,miscEZdrowieRPLXML}. 
+This makes it possible to treat ChPL documents not only as individual PDF files, but also as a potential source for a structured drug knowledge base.
+
+However, ChPL documents are not designed primarily for automatic decision support. 
+They are usually distributed as PDF or text documents intended for human reading. 
+Relevant dosing information may be written as free text, placed in tables, repeated across sections, or expressed using different renal function metrics such as creatinine clearance or eGFR. 
+Recommendations may also depend on the pharmaceutical form, route of administration, dose strength, age group, or clinical context. 
+Therefore, the same active substance cannot always be represented by a single universal rule.
+
+For the prototype developed in this thesis, ChPL documents are treated as the primary source of renal dosing rules, but not as directly executable logic. 
+The information extracted from them must first be transformed into a structured representation containing the drug product, route of administration, renal function metric, renal function range, recommendation type, source section, and validation status. 
+Only validated rules are used by the recommendation engine. 
+This approach keeps the final decision process traceable to official product information while still allowing the system to operate on structured data.
+
+\section{Clinical Decision Support Systems}\label{sec:cdss}
+
+A clinical decision support system (CDSS) is a type of healthcare software that combines patient-specific information with medical knowledge in order to support clinical decision-making~\cite{artBates2003TenCommandments}. 
+In contrast to general healthcare data platforms, a CDSS is not mainly focused on storing or moving data, but on interpreting it in a specific clinical context and returning an output that can be used by the clinician.
+
+In this thesis, the supported clinical decision is limited to renal dose adjustment. 
+The system receives basic patient parameters and a medication list, calculates renal function, and compares the result with validated dosing rules derived from Summary of Product Characteristics documents. 
+The output belongs to one of several recommendation categories: \textit{standard dose}, \textit{adjust dose or interval}, \textit{additional monitoring}, \textit{avoid}, or \textit{manual review required}.
+
+Renal dosing is a suitable use case for decision support, because several studies have shown that inappropriate dosing is common in patients with reduced kidney function~\cite{artDowling2010RenalDrugDosing,artStevens2009DrugDosingRecommendations}. 
+Computerized dosing support was also shown to improve the appropriateness of prescriptions for patients with renal insufficiency in selected clinical settings~\cite{artChertow2001GuidedMedicationDosing,artTerrell2010CDSSRenalDosing}. 
+These findings give a practical motivation for building a prototype that applies renal dosing rules in a structured and traceable way.
+
+CDSS implementations can be described using several practical distinctions. 
+A system may be \textit{active} or \textit{passive}, depending on whether it automatically generates alerts or responds only to an explicit user request. 
+It may also be \textit{embedded} into an electronic health record workflow or operate as a \textit{standalone} tool. 
+Finally, it may be \textit{knowledge-driven}, using validated rules, or \textit{data-driven}, using models trained on historical data.
+
+The prototype developed in this thesis is intentionally designed as a passive, standalone, knowledge-driven system. 
+It is passive because the physician explicitly enters patient data and asks for a recommendation. 
+It is standalone because it is not integrated with hospital information systems or electronic health records. 
+It is knowledge-driven because recommendations are generated by a deterministic rule-based engine using validated rules stored in the knowledge base, not by a model trained on historical clinical data.
+
+Explainability is an important requirement for this type of system. 
+A recommendation should show which rule was applied, which patient value matched the rule, and which source document supports the recommendation. 
+This requirement directly influences the data model: every renal dosing rule stored in the knowledge base contains a reference to the source document and to the section from which it was derived.
+
+Another important design issue is the risk of non-actionable or excessive alerts. 
+Drug safety alerts are frequently overridden in clinical practice, and high override rates have been reported in computerized physician order entry systems~\cite{artVanderSijs2006Override}. 
+For this reason, the prototype follows a conservative answering policy. 
+If no validated rule matches the drug, route of administration, and renal function range, the system does not try to infer a recommendation and instead returns \textit{manual review required}. 
+This behaviour is consistent with the principle that decision support should be actionable, transparent, and fitted to the user's workflow~\cite{artBates2003TenCommandments}.
+\section{Healthcare Data Platforms and Polish E-Health Context}
+\label{sec:healthcare-data-platforms}
+
+Modern clinical decision support systems are usually not isolated applications. 
+In real healthcare environments, decision support depends on access to structured data, reliable source documents, integration mechanisms, audit logs, and controlled user access. 
+For this reason, many enterprise systems follow a platform-oriented approach, where data from multiple sources is accumulated, normalized, analysed, governed, and then used to support operational decisions.
+
+Examples of such platform-oriented systems include Palantir Foundry and Snowflake. 
+Palantir Foundry provides tools for data integration and uses an ontology layer to organize data, models, and operational objects into a shared representation of an organization~\cite{miscPalantirFoundryDataIntegration,miscPalantirFoundryOntology}. 
+Snowflake represents a cloud data platform approach that supports data storage, analytics, engineering workflows, applications, and data sharing within a managed environment~\cite{miscSnowflakeAIDataCloud}. 
+Although these systems are not clinical decision support systems by themselves, they illustrate an important architectural pattern: data ingestion, structured storage, governance, analytics, and user-facing workflows can be combined within one platform.
+
+This type of architecture is relevant to healthcare because clinical data is often distributed across many systems and must be transformed before it can be used for decision-making. 
+A similar platform-oriented direction can also be observed in modern healthcare interoperability standards. 
+For example, the HL7 FHIR Clinical Reasoning module describes how clinical knowledge artifacts, such as decision support rules, protocols, and quality measures, can be represented and exchanged between healthcare systems~\cite{miscHL7FHIRClinicalReasoning}. 
+This shows that decision support is not only a matter of implementing algorithms, but also of organizing knowledge, data, and workflow integration.
+
+A comparable digital transformation can be observed in the Polish healthcare system. 
+The national e-health system, known as P1, provides digital services such as electronic prescriptions, electronic referrals, electronic medical documentation, medical events, e-registration, the Internet Patient Account, the mojeIKP application, and gabinet.gov.pl~\cite{miscEZdrowieP1}. 
+These services support patients, medical professionals, healthcare providers, and public administration, showing that healthcare in Poland is increasingly based on structured digital data exchange.
+
+The prototype developed in this thesis is not integrated with national e-health infrastructure and does not process real patient data. 
+However, its internal architecture follows a simplified version of the same general idea. 
+Drug information is imported from official source documents, transformed into structured rules, stored in a knowledge base, and then used by a decision engine to generate explainable recommendations. 
+In this sense, the system can be treated as a small domain-specific decision support platform focused only on renal dose adjustment.
+
+
+\section{Rule-Based and AI-Assisted Decision Support}
+\label{sec:rule-ai-decision-support}
+
+Decision support systems can use different approaches to generate recommendations. 
+In this thesis, the final recommendation is produced by a rule-based decision engine. 
+This means that the system does not learn dosing decisions from historical patient data, but applies explicitly defined rules stored in the knowledge base. 
+For the renal dosing problem, such rules connect a drug product, route of administration, renal function metric, renal function range, and recommendation type.
+
+A rule-based approach is suitable for this prototype for several reasons. 
+First, renal dosing recommendations from ChPL documents are often expressed as thresholds or categories, for example for patients with creatinine clearance below a given value. 
+Second, rule-based decisions are easier to test and explain than black-box model outputs. 
+Third, every recommendation can be traced back to a specific source document and section. 
+This is important in a medical-informatics system, where the user should be able to understand why a recommendation was returned and which source supports it.
+
+A simplified renal dosing rule can be represented as:
+
+\begin{equation}
+R = (d, r, m, [a,b), t, s)
+\end{equation}
+
+where \(d\) is the drug product, \(r\) is the route of administration, \(m\) is the renal function metric, \([a,b)\) is the renal function range, \(t\) is the recommendation type, and \(s\) is the source reference. 
+During recommendation generation, the decision engine checks whether the patient case matches the drug, route, and renal function range defined in the rule. 
+If a matching validated rule exists, the corresponding recommendation is returned. 
+If no validated rule matches, the system returns \textit{manual review required} instead of generating an unsupported recommendation.
+
+Artificial intelligence can still be useful in this project, but its role is different. 
+ChPL documents are usually written as human-readable text and may contain tables, section references, and non-uniform wording. 
+Because of this, extracting renal dosing information from them may be time-consuming. 
+An AI-assisted module may help identify relevant fragments of text, suggest candidate renal thresholds, classify recommendation types, or produce a structured draft rule. 
+Recent work on large language models for drug-label and drug-safety information extraction shows that such models can support extraction tasks from regulatory drug documents, but also that their outputs require careful validation~\cite{artWu2025AskFDALabel,artGisladottir2025DrugSafetyLLM}.
+
+In the proposed architecture, AI-generated outputs are therefore treated only as candidate rules. 
+They are stored with a pending validation status and cannot be used by the recommendation engine until they are reviewed and approved. 
+This separation is important because large language models may misinterpret source text, omit conditions, confuse units, or overinterpret ambiguous information. 
+Reviews of large language models in medicine emphasize that, although these systems may be useful in clinical and biomedical workflows, reliability, hallucination risk, and human oversight remain important concerns~\cite{artJung2025LLMsMedicine,artAsgari2025LLMHallucinationSafety}.
+
+The final decision workflow is therefore hybrid but conservative. 
+AI may support document processing, while the actual recommendation is generated only from validated structured rules. 
+This design keeps the most safety-critical part of the system deterministic, explainable, and auditable. 
+It also fits the engineering scope of the thesis: the objective is not to train a new clinical model, but to build a prototype that transforms official drug information into a structured knowledge base and applies it through a transparent decision process.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Requirements and Dataset}
+\section{Functional Requirements}
+\section{Non-Functional Requirements}
+\section{Selected Drug Groups}
+\section{Source Documents and Manual Rule Preparation}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{System Design}
+\section{General System Architecture}
+\label{sec:general-system-architecture}
+
+RenalSafe is implemented as a standalone web application with three main components: a browser-based user interface, an application backend, and a relational database.
+The interface is developed in React and TypeScript, while the backend is written in Go.
+The Go service exposes a REST API and serves the compiled interface, so the browser communicates with a single application service.
+PostgreSQL with the pgvector extension stores source documents, structured rules, synthetic patient records, assessment results, and audit events.
+
+The backend separates renal function calculation, rule matching, document processing, and persistence into distinct modules within one application.
+The renal calculator derives estimates from the supplied patient parameters.
+The decision engine evaluates approved rules against the medication context and the renal function metric required by each rule.
+A successful match returns the rule's recommendation and source reference; missing information or the absence of a unique applicable rule results in a manual-review status.
+The engine does not call a language model, and its explanations are constructed from the calculation, matched rule, and supporting source evidence.
+
+Knowledge preparation follows a separate workflow within the same service.
+PDF text is extracted using Poppler, and candidate rules can be prepared manually or suggested by an optional language-model provider.
+Model-assisted extraction is handled by a background worker in the Go application.
+Suggestions must be explicitly saved as pending candidates and reviewed by a pharmacist before they can be approved for use by the decision engine.
+This separation allows assessments based on existing approved rules to operate without the model provider.
+
+The local deployment consists of an application container and a database container managed by Docker Compose.
+The implemented architecture supports demonstration with synthetic patient data; clinical validation and model-quality evaluation are separate from the implementation described here.
+
+\section{Decision Models}
+\section{Knowledge Base Design}
+\section{Recommendation Workflow}
+\section{AI-Assisted Rule Extraction Workflow}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Implementation}
+\section{Technology Stack}
+\section{Backend Implementation}
+\section{Renal Function Calculator}
+\section{Rule-Based Recommendation Engine}
+\section{Document Processing Module}
+\section{User Interface}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Testing and Evaluation}
+\section{Testing Strategy}
+\section{Synthetic Patient Cases}
+\section{Evaluation of Rule Matching}
+\section{Example Recommendations}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Conclusions}
+\section{Summary of Results}
+\section{Limitations}
+
+The prototype is limited to a selected set of drugs and manually validated rules.
+It does not cover all medicines available in clinical practice and does not attempt
+to replace full pharmaceutical review.
+The system uses synthetic patient cases and is not integrated with hospital
+information systems or electronic health records. Therefore, the evaluation is
+technical and functional rather than clinical.
+The system relies on information extracted from ChPL documents. Although
+these documents are official sources, their structure is not always convenient for
+automatic processing, especially when information is provided as free text or
+tables.
+AI-assisted extraction, if used, is treated only as a support mechanism. Can-
+didate rules requires clinical validation before they can be used by the recommendation engine.
+\section{Future Work}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Some chapter title}\label{ch:someLabel}
+
+
+\section{Typography}\label{sec:typography}
+
+This document was generated using \href{https://en.wikipedia.org/wiki/LaTeX}{\LaTeX{}} --- a professional and free typesetting environment.
+When writing scientific texts, it is much better to use \LaTeX{} than Word~\cite{bookOetiker2023}.
+You can install \LaTeX{} on your computer or use online environments like \href{https://www.overleaf.com}{Overleaf}.
+
+\section{This and that}\label{sec:someLabel}
+
+In the English typography, the space after the dot ending a sentence is wider than other spaces. 
+Therefore, you should inform \LaTeX{} explicitly whenever a dot does not end a sentence, like in e.g.\ or i.e.\ or some other cases. 
+You can achieve it by using the backslash-space sequence, \verb!\ !, right after the dot in the source {\tt .tex} file.
+
+An example equation could be
+\begin{equation}
+    E = m c^2
+    \label{eq:Emc2},
+\end{equation}
+where $E$ denotes \dots\ 
+
+Note that in the {\tt .tex} file, an equation description that follows right after the equation should be continued without an empty line in between the equation and its description because an empty like starts a new paragraph in the compiled document.
+
+A new paragraph is indented. 
+If for some specific reason you do not want a new paragraph to be indented, use \verb!\noindent! command at the beginning of that paragraph.
+
+Equation~\eqref{eq:Emc2} looks familiar.
+Note a convenient link reference to the equation in the text.
+This is done easily using a dedicated label, as you can check in the source {\tt .tex} file.
+Similarly, you can (and should) link figures (see Fig.~\ref{fig:formats}), tables (see Tab.~\ref{tab:mist}), sections (e.g.\ Sec.~\ref{sec:aimNscope}), and chapters (e.g.\ Chap.~\ref{ch:disco}).
+And this is a sentence with a book citation~\cite{bookSurname2020} and an article citation~\cite{artSurname2022}.
+
+
+\section{Figures}\label{sec:figs}
+
+Figures which do not present photographs should be generated as \href{https://en.wikipedia.org/wiki/Vector_graphics}{\em vector graphics}.
+This is particularly important for plots (like in Fig.~\ref{fig:formats}) and flowcharts (like in Fig.~\ref{fig:xhy}). 
+Suitable formats for this type of graphics which can be handled by \LaTeX{} are \href{https://en.wikipedia.org/wiki/Encapsulated_PostScript}{Encapsulated PostScript} (EPS) and \href{https://en.wikipedia.org/wiki/PDF}{Portable Document Format} (PDF).
+
+\begin{figure}
+	\centering
+	\begin{subfigure}[b]{\columnwidth}
+	\centering
+	\includegraphics[width=\columnwidth]{figs/someSignal.jpg}
+	\caption{Ugly, compressed JPG.
+    Enlarge it on screen to better see compression artefacts.}
+	\label{fig:jpg}
+	\end{subfigure}
+	
+	\vspace{6mm}
+	
+	\begin{subfigure}[b]{\columnwidth}
+	\centering
+	\includegraphics[width=\columnwidth]{figs/someSignal.png}
+	\caption{Somewhat nicer PNG, yet, it is still a \href{https://en.wikipedia.org/wiki/Raster_graphics}{raster image}.}
+	\label{fig:png}
+	\end{subfigure}
+	
+	\vspace{6mm}
+	
+	\begin{subfigure}[b]{\columnwidth}
+	\centering
+	\includegraphics[width=\columnwidth]{figs/someSignal.eps}
+	\caption{Nice, \href{https://en.wikipedia.org/wiki/Vector_graphics}{vector-graphic} EPS.
+    It can be enlarged on screen to better see details.}
+	\label{fig:eps}
+	\end{subfigure}
+ 
+	\caption[A short caption for the list of figures]
+    {Differences in graphics quality depending on the format used. 
+	Always remember to label each axis correctly, including physical units.
+	For good readability, it is important to use a large enough font size in the labels.}
+	\label{fig:formats}
+\end{figure}
+
+\subsection{Flowcharts}\label{ssec:flow}
+
+A free and convenient online tool for creating flowcharts is \href{https://draw.io}{draw.io}.
+It enables export to vector graphics via {\tt File | Export as | PDF}.\footnote{Do not forget to mark the {\tt Crop} option to avoid unnecessary white margins.}
+Once you have selected {\tt Extras | Mathematical Typesetting}, you can easily add \href{https://www.diagrams.net/doc/faq/math-typesetting}{mathematical expressions} to your flowchart. 
+Figure~\ref{fig:xhy} shows an example flowchart generated in  \href{https://draw.io}{draw.io}.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\textwidth]{figs/xhy.pdf}
+    \caption[A filter]
+    {
+    An example flowchart created in \href{https://draw.io}{draw.io}.
+    Note that it is a \href{https://en.wikipedia.org/wiki/Vector_graphics}{vector graphic}.
+    Flowcharts should {\em never} be \href{https://en.wikipedia.org/wiki/Raster_graphics}{raster graphics}.
+    Do not forget to describe in the caption what the flowchart depicts.
+    Here, an input $x[n]$ goes through a filter $h[n]$, which outputs $y[n]$.
+    }
+    \label{fig:xhy}
+\end{figure}
+
+\subsection{Figure and table placement}\label{ssec:place}
+
+You can be surprised that \LaTeX{} places figures and tables at locations that may appear not optimal to you.
+Do not worry --- in 99.(9)\% of cases, \LaTeX{} is right and really knows it better.
+Note that in every professionally typeset book, figures and tables are placed either at the top or at the bottom of a page (or on a separate page, when a figure or table is large enough), not in between some text fragments. 
+This is the way \LaTeX{} does it and it really should be done so.
+Forget your old habits in this respect.
+If you really have to place a figure or a table at some particular location, there is a simple way to do it~\cite{bookOetiker2023}.
+
+
+\section{Tables}\label{sec:tab}
+
+It is very easy to create simple tables in \LaTeX{}.
+When a more complex layout is needed, it may be helpful to use the generator available at \url{https://www.tablesgenerator.com/latex_tables}.
+
+In contrast to figures, tables usually have their captions above rather than below them.
+
+
+\section{Fragments of code}\label{sec:code}
+
+In case you need to show a fragment of code of your computer program, place it in the \verb!verbatim! environment.
+This will result in a \href{https://en.wikipedia.org/wiki/Monospaced_font}{\em monospaced font}, like in a typical programming environment. 
+Here is a MATLAB code generating Fig.~\ref{fig:eps}.
+Let us remind that it is good practice to comment the code.
+
+\begin{verbatim}
+set(groot, 'DefaultAxesTickLabelInterpreter', 'LaTeX');  
+set(groot, 'DefaultLegendInterpreter'       , 'LaTeX');
+set(groot, 'DefaultTextInterpreter'         , 'LaTeX');
+set(0    , 'DefaultFigureColor'             , 'w'    );
+
+fs = 1e3;  % Sampling frequency [Hz].
+t  = 0 : 1/fs : 10 - 1/fs;  % Discrete time domain [s].
+f  = 1 : 3;  % Some frequencies [Hz].
+
+s = zeros(size(t));
+for ii = 1 : length(f)
+    s = s + sin(2 * pi * f(ii) * t) / ii;
+end
+
+figure('Position', [1e2 1e2 15e2 5e2])
+plot(t, s, 'Color', [0 .5 0], 'LineWidth', 2);  grid
+xtickformat('$%g$');  ytickformat('$%g$')  % For proper minuses.
+set(gca, 'FontSize', 20)
+xlabel('$t$ [s]');  ylabel('$s(t)$ [mV]')
+
+set(gcf, 'renderer', 'painters')  % For vector-graphics output.
+exportgraphics(gcf, 'someSignal.eps')
+\end{verbatim}
+
+Such a code is, of course, too trivial to be shown in a thesis; here it only serves as an illustrative example.
+
+
+\section{Typical mistakes}\label{sec:mist}
+
+Typical formatting mistakes and ways out are explained in Tab.~1 and \href{https://ibp.pwr.edu.pl/cs/Krotko-o-pisaniu.pdf}{related text}~\cite{miscSieluzycki2024}.
+One should also carefully distinguish between the \href{https://en.wikipedia.org/wiki/Hyphen}{hyphen} (-), \href{https://en.wikipedia.org/wiki/Dash}{dashes} (--, ---), and the \href{https://en.wikipedia.org/wiki/Plus_and_minus_signs}{minus sign} ($-$).
+The minus sign requires using the {\em math mode};
+for example, \verb!$-1$! in the {\tt .tex} file results in $-1$ in the {\tt .pdf} file.
+Let us also recall that unlike in programming languages, the star (*) in mathematics does not denote plain multiplication but \href{https://en.wikipedia.org/wiki/Convolution}{convolution}. 
+Therefore, it should not be used to denote plain multiplication in mathematical expressions.
+
+\begin{table}
+\centering
+\caption[Typical formatting mistakes]
+{Typical formatting mistakes.
+{\em Risky} means that the physical unit can move to the next line while the number will remain in the preceding line, which is not desired.
+Source:~\cite{miscSieluzycki2024}.}
+\begin{tabular}{ll||ll}
+\multicolumn{2}{l||}{\bf Incorrect}         & \multicolumn{2}{l}{\bf Correct}       \\ \hline
+\multicolumn{1}{l|}{Syntax in {\tt .tex}} & Effect in {\tt .pdf} & \multicolumn{1}{l|}{Syntax in {\tt .tex}} & Effect in {\tt .pdf} \\ \hline
+\multicolumn{1}{l|}{\tt 20mV}    & 20mV    & \multicolumn{1}{l|}{\tt 20\~{}mV}    & 20~mV    \\
+\multicolumn{1}{l|}{\tt \$20mV\$}    & $20mV$    & \multicolumn{1}{l|}{\tt \$20\~{}\{\textbackslash{}rm mV\}\$}    & $20~{\rm mV}$    \\
+\multicolumn{1}{l|}{\tt 20 mV}    & Risky   & \multicolumn{1}{l|}{\tt 20\~{}mV}    & 20~mV    \\
+\multicolumn{1}{l|}{\tt \$2 * x\$}    & $2 * x$    & \multicolumn{1}{l|}{\tt \$2 x\$}    & $2 x$    \\
+\multicolumn{1}{l|}{\tt \$2 * 3\$}    & $2 * 3$    & \multicolumn{1}{l|}{\tt \$2 \textbackslash{}cdot 3\$}    & $2 \cdot 3$    \\
+\multicolumn{1}{l|}{\tt MxN}    & MxN    & \multicolumn{1}{l|}{\tt \$M \textbackslash{}times N\$}    & $M \times N$    \\
+\multicolumn{1}{l|}{\tt -1}    & -1    & \multicolumn{1}{l|}{\tt \$-1\$}    & $-1$    \\
+\multicolumn{1}{l|}{\tt \$sin(x)\$}    & $sin(x)$    & \multicolumn{1}{l|}{\tt \$\textbackslash{}sin(x)\$}    & $\sin(x)$    \\
+\multicolumn{1}{l|}{\tt \$max(x)\$}    & $max(x)$    & \multicolumn{1}{l|}{\tt \$\textbackslash{}max(x)\$}    & $\max(x)$    \\
+\multicolumn{1}{l|}{\tt \$s\_\{out\}\$}    & $s_{out}$    & \multicolumn{1}{l|}{\tt \$s\_\{\textbackslash{}rm out\}\$}    & $s_{\rm out}$    \\
+\multicolumn{1}{l|}{\tt \$u\_\{\textbackslash{}rm ij\}\$\ }    & $u_{\rm ij}$    & \multicolumn{1}{l|}{\tt \$u\_\{ij\}\$}    & $u_{ij}$    \\
+\multicolumn{1}{l|}{\tt \$\{\textbackslash{}bf U\}\^{}T\$}    & ${\bf U}^T$    & \multicolumn{1}{l|}{\tt \$\{\textbackslash{}bf U\}\^{}\{\textbackslash{}rm T\}\$}    & ${\bf U}^{\rm T}$
+\end{tabular}
+\label{tab:mist}
+\end{table}
+
+
+\section{Referring to sources of information}\label{sec:sources}
+
+Avoid \href{https://en.wikipedia.org/wiki/Plagiarism}{plagiarism} by all means.
+Remember to correctly cite the source material, also in figure and table captions.
+
+In the bibliography list at the end of your thesis, include only those items that you cite in the main text.
+Likewise, each item of the list should be cited in the main text.
+This is easy to achieve in \LaTeX{} --- see \href{https://en.wikipedia.org/wiki/BibTeX}{BibTeX}, which will also format the items according to the style that you specified with the \verb!\bibliographystyle! command in the {\tt .tex} file. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Discussion}\label{ch:disco}
+
+A well written thesis should contain a well written discussion of the results obtained, with references to the exiting literature as well as to the aim of the thesis.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\bibliographystyle{plain}
+\bibliography{refs}
+
+\appendix
+
+\renewcommand*\listfigurename{List of figures} 
+\hypersetup{linkcolor=black}
+\listoffigures
+
+\renewcommand*\listtablename{List of tables} 
+\hypersetup{linkcolor=black}
+\listoftables
+
+\end{document}
