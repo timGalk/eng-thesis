@@ -330,7 +330,41 @@ The local deployment consists of an application container and a database contain
 The implemented architecture supports demonstration with synthetic patient data; clinical validation and model-quality evaluation are separate from the implementation described here.
 
 \section{Decision Models}
+\label{sec:decision-models}
+
+RenalSafe evaluates each medication in an assessment against the renal function metric specified by its approved rules.
+The calculator computes the available estimates once for the patient. These can include Cockcroft--Gault creatinine clearance in \(\mathrm{mL/min}\) and the 2021 CKD-EPI creatinine estimate of glomerular filtration rate in \(\mathrm{mL/min}/1.73\,\mathrm{m}^{2}\).
+Their availability depends on the inputs. For example, if the other inputs pass validation but body weight is missing, the calculator can still return an indexed eGFR. A medication whose rules require creatinine clearance then receives a manual-review result.
+
+The engine first selects approved rules that exactly match the product, route of administration, pharmaceutical form, and indication.
+These rules must specify a single renal metric. The engine compares the unrounded estimate for that metric with each rule's interval, respecting whether each endpoint is included.
+Exactly one interval must contain the estimate. The rule's approval must also be effective at the assessment time, and the patient must satisfy any age or weight conditions recorded in the rule.
+If any of these checks fails, the result identifies the reason for manual review and contains no dosing action.
+
+The distinction between a point estimate and a range matters near a threshold. In a synthetic software test, two creatinine clearance rules cover \([0,30)\) and \([30,\infty)\) in \(\mathrm{mL/min}\). A value of exactly \(30\) matches the second rule.
+If the request also supplies lower and upper bounds for serum creatinine, the calculator propagates both through the equation. When the resulting clearance interval extends across the threshold, the engine returns manual review even though the point estimate alone matches one rule.
+
+A successful match returns the action recorded in the rule (no change, reduce dose, extend interval, avoid use, or use with caution), together with its source citation and any dosing instructions stored in the rule.
+Checking a proposed prescription is a separate, optional decision. For an avoidance rule, the engine flags the proposed use as outside the rule limits. For other actions, it can compare the entered single dose and dosing interval with an explicit maximum single dose and minimum interval.
+If those limits are absent or the dose units differ, the prescription check requires manual review. The user can therefore see which adjustment rule applies even when the system cannot assess the proposed regimen.
+
 \section{Knowledge Base Design}
+\label{sec:knowledge-base-design}
+
+The PostgreSQL schema connects three records that answer different questions about a recommendation. The document identifies the edition of the product information, the passage locates the evidence within that edition, and the rule expresses the conditions under which the evidence can be applied.
+One document can contain several passages, and several rules can cite the same passage. This allows individual rows of a renal dosing table to be represented as distinct intervals while retaining their common source.
+
+The \texttt{documents} table stores the original PDF and its extracted text alongside the medication context, source URL, version, retrieval time, and a SHA-256 digest for each representation.
+The \texttt{chunks} table records the section, physical page range, byte offsets in the extracted text, and passage content. Full-text search and optional vector search operate on these passages.
+When a reviewer saves a candidate rule, the quoted text must occur exactly once in the selected passage. The application uses the position of that occurrence to determine the physical page, so a reviewer can locate the same wording in the stored PDF.
+
+The \texttt{renal\_rules} table links each rule to its document and passage. It stores the medication context, metric, renal interval, and review status in columns, and preserves the complete rule, including the action, optional conditions, and citation, in a JSON payload.
+A database constraint prevents two approved rules for the same medication context and metric from covering a common value. It permits gaps, which the decision engine handles through manual review as described in Section~\ref{sec:decision-models}.
+
+New candidates enter review as pending. A pharmacist approves or rejects a specific candidate by submitting its content digest and a review note. Approval also requires explicit confirmation and records the reviewer's identity and the time of approval.
+This ties the decision to the version the pharmacist inspected. If another user edits the pending candidate before the review is submitted, the digest changes and the earlier review cannot be applied.
+When a source document is superseded by another for the same medication context, the application marks its pending and approved rules as superseded in the same database transaction. Subsequent assessments use the active sources, while earlier assessments retain the rule and citation originally returned.
+
 \section{Recommendation Workflow}
 \section{AI-Assisted Rule Extraction Workflow}
 
