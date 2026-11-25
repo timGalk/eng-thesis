@@ -413,6 +413,41 @@ Both results remain available for comparison, each with the measurement and rule
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Implementation}
 \section{Technology Stack}
+\label{sec:technology-stack}
+
+Docker Compose runs the RenalSafe application and its PostgreSQL database as two local services.
+Building the application requires a larger set of tools than running it.
+Table~\ref{tab:technology-stack} identifies the role of each technology in the implementation.
+
+\begin{table}[htbp]
+    \centering
+    \caption[RenalSafe technology stack]{Technologies used to build and run RenalSafe, as specified in the application repository at revision \texttt{9c3cc33}.}
+    \label{tab:technology-stack}
+    \begin{tabularx}{\linewidth}{@{}l >{\raggedright\arraybackslash}X@{}}
+        \toprule
+        \textbf{Technology} & \textbf{Role in RenalSafe} \\
+        \midrule
+        React 19 and TypeScript 5.9 & Implement the browser interface for patient cases, medication assessments, and rule review. \\
+        Node.js 22 and Vite 8 & Run the frontend build and bundle the browser assets. \\
+        Go 1.25 & Implements the HTTP API, renal calculations, rule evaluation, and database access through the \texttt{pgx} driver. \\
+        PostgreSQL 18 & Stores documents, rules, and assessment history. The \texttt{pgvector} extension supports passage search by embedding similarity. \\
+        Poppler & Provides \texttt{pdftotext} for extracting UTF-8 text from imported SmPC files while retaining their page layout as far as possible. \\
+        Docker Compose & Starts the application and database containers and attaches a persistent volume to PostgreSQL. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The browser and the Go service share an OpenAPI description of the requests and responses exchanged through the API.
+For example, the assessment form uses TypeScript types generated from this description when it submits a medication list and reads the saved result.
+During the container build, the frontend build script regenerates the type definitions, checks them against the copy in the repository, and type-checks the interface before Vite bundles it.
+The Go build then embeds the resulting assets in the server executable.
+This lets the browser load the interface and submit assessments to the same origin, with Node.js needed only at build time.
+
+The storage layer uses different PostgreSQL features for passage retrieval and rule matching.
+Evidence retrieval can rank passages using full-text search or stored embeddings.
+Rule matching uses explicit renal intervals, represented in PostgreSQL by the \texttt{numrange} type.
+A database exclusion constraint uses \texttt{btree\_gist} to combine equality on medication context and metric with an overlap check on the interval, enforcing the approval condition described in Section~\ref{sec:knowledge-base-design}.
+
 \section{Backend Implementation}
 \section{Renal Function Calculator}
 \section{Rule-Based Recommendation Engine}
