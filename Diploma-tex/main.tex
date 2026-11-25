@@ -135,39 +135,47 @@ It is necessary because impaired renal function can reduce the elimination of dr
 Depending on the medicine, renal impairment may require a lower dose, a longer dosing interval, additional monitoring, avoidance of the drug, or manual clinical review. 
 The need for adjustment depends not only on the degree of renal impairment, but also on drug-specific factors, such as the fraction eliminated by the kidneys, the presence of active metabolites, the therapeutic index, and the risk of adverse effects~\cite{artDooguePolasek2011DrugDosingRenalDisease,artStefani2019AdjustDrugDosesCKD}.
 
-A key technical problem in renal dose adjustment is the estimation of kidney function. 
-Historically, creatinine clearance has often been estimated using the Cockcroft--Gault equation, which uses age, body weight, sex, and serum creatinine~\cite{artCockcroftGault1976}. 
-Although modern clinical practice often reports estimated glomerular filtration rate (eGFR), drug dosing recommendations and prescribing information have frequently been based on creatinine clearance thresholds~\cite{artDowling2010RenalDrugDosing,artJones2011RenalFunctionDrugDosing}. 
-For this reason, the prototype treats renal function calculation as a separate module and uses established formulas instead of developing a new clinical model.
+\paragraph{Glomerular filtration and its estimation.}
+Each nephron begins with a glomerulus, a network of capillaries through which water and small dissolved substances pass from blood plasma into the renal tubule.
+Blood cells and most proteins remain in the circulation.
+The tubule subsequently returns much of the filtered water and useful solutes to the blood and secretes additional substances into the tubular fluid.
+Together, these processes allow the kidneys to remove waste while regulating the body's water and electrolyte balance~\cite{miscNIDDKKidneys}.
 
-The Cockcroft--Gault equation estimates creatinine clearance as follows:
+The glomerular filtration rate (GFR) is the volume of filtrate formed by all functioning glomeruli per unit time.
+In routine practice, a blood sample can be used to estimate this rate from the serum concentration of creatinine, a waste product of muscle metabolism.
+With stable creatinine production and kidney function, a lower filtration rate generally corresponds to a higher serum creatinine concentration.
+Muscle mass and tubular secretion also influence that concentration, so two people with the same serum creatinine can have different filtration rates~\cite{miscNIDDKDrugDosing}.
+The term \emph{estimated GFR} (eGFR) refers to the result of an estimating equation.
 
+\paragraph{The two estimates used in RenalSafe.}
+The 2021 creatinine equation from the Chronic Kidney Disease Epidemiology Collaboration (CKD-EPI) estimates GFR from age, sex, and standardized serum creatinine~\cite{artInker2021CKDEPI}.
+Let \(A\) be age in years, \(\mathrm{SCr}\) the numerical value of serum creatinine in \(\mathrm{mg/dL}\), and \(x=\mathrm{SCr}/\kappa\).
+Then
 \begin{equation}
-CrCl =
-\frac{(140 - age) \cdot weight}{72 \cdot SCr}
+    \mathrm{eGFR}_{\mathrm{cr}} =
+    142\,\min(x,1)^{\alpha}\,\max(x,1)^{-1.200}\,0.9938^{A}\,f ,
+    \label{eq:implemented-ckd-epi}
 \end{equation}
+where the female coefficients are \(\kappa=0.7\), \(\alpha=-0.241\), and \(f=1.012\), and the male coefficients are \(\kappa=0.9\), \(\alpha=-0.302\), and \(f=1\).
+The result is expressed in \(\mathrm{mL/min}\) per \(1.73\,\mathrm{m}^{2}\) of body surface area.
+Indexing to this reference surface area allows filtration estimates to be compared across individuals of different sizes~\cite{miscNIDDKDrugDosing}.
 
-where \(CrCl\) is creatinine clearance in ml/min, \(age\) is given in years, \(weight\) in kilograms, and \(SCr\) is serum creatinine in mg/dl. 
-For female patients, the result is multiplied by 0.85:
-
+Some prescribing information specifies thresholds in terms of estimated creatinine clearance (CrCl)~\cite{artDowling2010RenalDrugDosing,artJones2011RenalFunctionDrugDosing}.
+Creatinine clearance is the volume of plasma from which the kidneys clear creatinine per unit time.
+Because the tubules secrete some creatinine in addition to the amount filtered at the glomerulus, creatinine clearance can exceed GFR~\cite{artJones2011RenalFunctionDrugDosing}.
+The Cockcroft--Gault equation estimates CrCl in \(\mathrm{mL/min}\) as
 \begin{equation}
-CrCl_{female} = CrCl \cdot 0.85
+    \mathrm{CrCl} = \frac{(140-A)\,W}{72\,\mathrm{SCr}}\,c ,
+    \label{eq:cockcroft-gault}
 \end{equation}
+where \(W\) is body weight in kilograms and \(c\) is \(0.85\) for females and \(1\) for males~\cite{artCockcroftGault1976}.
+Both equations use serum creatinine in \(\mathrm{mg/dL}\). A concentration reported in \(\mu\mathrm{mol/L}\) is converted by dividing its numerical value by \(88.4\).
 
-If serum creatinine is provided in \(\mu mol/l\), it is converted to mg/dl before applying the formula:
-
-\begin{equation}
-SCr_{mg/dl} = \frac{SCr_{\mu mol/l}}{88.4}
-\end{equation}
-
-The choice of renal function estimate may affect dosing decisions. 
-Several publications discuss differences between creatinine clearance and eGFR-based approaches for medication dosing and show that these values should not always be treated as interchangeable~\cite{artStevens2009DrugDosingRecommendations,artHudsonNolin2018KidneyFunctionDrugDosing}. 
-Therefore, the system stores the renal function metric used by each dosing rule and does not assume that every recommendation can be applied to every renal function estimate.
-
-From the perspective of this project, renal dose adjustment is represented as a rule-matching problem. 
-A rule connects a drug product, route of administration, renal function metric, renal function range, recommendation type, and source reference. 
-The decision engine calculates renal function, searches for a matching validated rule, and returns an explainable recommendation. 
-If no validated rule is available, the system returns a manual review recommendation instead of guessing.
+\paragraph{Relevance to dosing.}
+When filtration declines, a drug that depends substantially on glomerular filtration for elimination may accumulate if the same dose is repeated at the same interval~\cite{artDooguePolasek2011DrugDosingRenalDisease}.
+The product information links a renal function range to a dosing instruction, so the choice of estimate matters particularly near a threshold~\cite{artStevens2009DrugDosingRecommendations,artHudsonNolin2018KidneyFunctionDrugDosing}.
+For example, when a rule specifies Cockcroft--Gault CrCl in \(\mathrm{mL/min}\), comparing its threshold directly with an indexed CKD-EPI value would change both the quantity and the units being compared.
+RenalSafe therefore records the required metric with each rule and requests manual review when that estimate is unavailable.
 
 \section{Summary of Product Characteristics as a Data Source}
 \label{sec:smpc-data-source}
@@ -449,7 +457,50 @@ Rule matching uses explicit renal intervals, represented in PostgreSQL by the \t
 A database exclusion constraint uses \texttt{btree\_gist} to combine equality on medication context and metric with an overlap check on the interval, enforcing the approval condition described in Section~\ref{sec:knowledge-base-design}.
 
 \section{Backend Implementation}
+\label{sec:backend-implementation}
+
+The Go backend separates HTTP request handling, database operations, and assessment logic into the \texttt{httpapi}, \texttt{store}, and \texttt{decision} packages.
+The patient assessment described in Section~\ref{sec:recommendation-workflow} illustrates how the three packages interact.
+A physician submits the identifier of a stored creatinine observation together with the current patient parameters and medication list.
+The HTTP handler checks the caller's role and decodes the JSON body into a typed request.
+The decoder rejects unknown fields and repeated keys, so a request containing two different creatinine values under the same key is rejected before it reaches the calculator.
+
+The handler passes the authenticated caller, patient identifier, and request to \texttt{AssessPatient} in the store package.
+For a new assessment, this method checks access to the case and retrieves the selected observation only if it belongs to the patient and has not been superseded.
+It copies the creatinine value, unit, sample time, standardization status, and any uncertainty bounds from that record into the assessment input.
+The store then loads a versioned knowledge snapshot and passes it with the completed request to \texttt{decision.Assess}.
+The decision function operates on these two inputs in memory, which also allows the same function to run in unit tests without an HTTP server or database.
+
+One PostgreSQL transaction saves the assessment, its knowledge snapshot, the link to the observation, and the corresponding audit events.
+The handler returns HTTP~201 with the saved record's location after the transaction commits.
+This distinction matters if the browser loses the response after a successful save.
+On a retry, the store looks up the request key for the same physician and patient and compares a digest of the submitted data with the stored digest.
+An identical submission returns the existing record. Reusing the key with changed inputs produces HTTP~409, leaving the original assessment available in the case history.
+
 \section{Renal Function Calculator}
+\label{sec:renal-function-calculator}
+
+The \texttt{renal.Calculate} function accepts the patient parameters and an explicit assessment time.
+It normalizes the measurement and any supplied bounds to \(\mathrm{mg/dL}\) using the conversion in Section~\ref{sec:renal-dose-adjustment}.
+It then checks the inputs against the prototype's adult, stable-renal-function policy.
+The policy accepts ages from 18 through 120 years and a sample taken no more than seven days before the assessment.
+It requires a supported equation sex, a standardized creatinine measurement, confirmation of stable renal function and typical body composition, and explicit exclusion of suspected acute kidney injury and dialysis.
+A missing confirmation or a sample dated after the assessment yields a warning and an empty set of estimates.
+The age and time limits describe the operating scope chosen for this prototype.
+
+After the shared input checks pass, the calculator evaluates Equation~\eqref{eq:implemented-ckd-epi} and records the result as indexed eGFR.
+It additionally evaluates Equation~\eqref{eq:cockcroft-gault} when actual body weight is confirmed and height is available for the body size check.
+Height is required by the implementation for its body mass index check, although height does not appear in the equation itself.
+When both weight and height are supplied, a body mass index outside the prototype interval of \(18.5\) to \(30\,\mathrm{kg/m^2}\) blocks both estimates.
+If height alone is missing and the other supplied inputs pass validation, the calculator returns indexed eGFR with a warning that creatinine clearance is unavailable.
+
+Each returned estimate carries its metric identifier, unit, formula version, point value, and bounds.
+When the request includes a creatinine interval, both endpoints must be included and the interval must contain the reported measurement.
+For fixed patient parameters, both equations decrease as creatinine rises, so the upper creatinine bound gives the lower renal estimate and the lower creatinine bound gives the upper estimate.
+For example, in the synthetic calculator fixture for a 70-year-old male weighing \(72\,\mathrm{kg}\), a creatinine concentration of \(1.0\,\mathrm{mg/dL}\) gives a Cockcroft--Gault estimate of \(70\,\mathrm{mL/min}\).
+With input bounds of \(0.9\) and \(1.1\,\mathrm{mg/dL}\), the corresponding clearance bounds are approximately \(63.6\) and \(77.8\,\mathrm{mL/min}\).
+The calculator passes the unrounded values to the decision engine for the interval check described in Section~\ref{sec:decision-models}.
+
 \section{Rule-Based Recommendation Engine}
 \section{Document Processing Module}
 \section{User Interface}
