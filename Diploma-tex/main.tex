@@ -360,8 +360,16 @@ If those limits are absent or the dose units differ, the prescription check requ
 \section{Knowledge Base Design}
 \label{sec:knowledge-base-design}
 
-The PostgreSQL schema connects three records that answer different questions about a recommendation. The document identifies the edition of the product information, the passage locates the evidence within that edition, and the rule expresses the conditions under which the evidence can be applied.
-One document can contain several passages, and several rules can cite the same passage. This allows individual rows of a renal dosing table to be represented as distinct intervals while retaining their common source.
+Figure~\ref{fig:knowledge-base-schema} shows how a dosing rule can be traced to the text that supports it.
+Its passage reference identifies the section and page containing the quotation, while its document reference identifies the edition of the SmPC.
+For example, if a dosing table lists three renal intervals in the same passage, each interval can have its own rule while all three rules refer to the same passage and document.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\linewidth]{figs/knowledge-base-schema.pdf}
+    \caption[Knowledge base schema]{Core knowledge base tables and selected columns. Each passage belongs to one document, and each rule cites one passage and one document. The label \texttt{0..*} means zero or more related records. PK denotes a primary key and FK a foreign key.}
+    \label{fig:knowledge-base-schema}
+\end{figure}
 
 The \texttt{documents} table stores the original PDF and its extracted text alongside the medication context, source URL, version, retrieval time, and a SHA-256 digest for each representation.
 The \texttt{chunks} table records the section, physical page range, byte offsets in the extracted text, and passage content. Full-text search and optional vector search operate on these passages.
@@ -375,6 +383,30 @@ This ties the decision to the version the pharmacist inspected. If another user 
 When a source document is superseded by another for the same medication context, the application marks its pending and approved rules as superseded in the same database transaction. Subsequent assessments use the active sources, while earlier assessments retain the rule and citation originally returned.
 
 \section{Recommendation Workflow}
+\label{sec:recommendation-workflow}
+
+In the patient workspace, the physician opens an active synthetic case and selects the creatinine observation to use for the assessment.
+If the measurement has yet to be recorded, the physician enters its value, unit, and sample time, together with its standardization status and any known uncertainty bounds.
+The assessment form displays these laboratory fields as read-only.
+On submission, the server reads them from the selected observation and verifies that it still belongs to the case and has not been superseded by a correction.
+
+The physician enters the patient's age and the sex used by the renal equations, supplies weight and height when available, and confirms the clinical conditions relevant to the calculation.
+For each medication, the physician selects a catalogue entry specifying the product, pharmaceutical form, route, and indication.
+Selecting a medication is sufficient to request its applicable adjustment rule.
+To check a proposed regimen as well, the physician enters both the single dose with its unit and the interval between doses.
+
+When the physician selects \emph{Calculate and save assessment}, the server evaluates the medications against a single knowledge-base snapshot using the decision model described in Section~\ref{sec:decision-models}.
+The result page shows the renal estimates and a separate outcome for each medication.
+For a match, the physician can inspect the action, any dosing instructions, and the supporting SmPC passage.
+For manual review, the page gives the reason, such as an unavailable renal metric.
+Consequently, one medication can have a documented recommendation while another in the same assessment still requires review.
+
+The server saves the inputs, results, knowledge snapshot, link to the observation, and audit events in one transaction.
+If the same submission is retried with its original request key, the physician receives the existing assessment.
+The case history also supports recalculation after a laboratory correction.
+For example, if a transcription error is discovered, the physician records a replacement observation and can use it in a new assessment linked to the earlier one.
+Both results remain available for comparison, each with the measurement and rules used at the time.
+
 \section{AI-Assisted Rule Extraction Workflow}
 
 
