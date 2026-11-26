@@ -64,7 +64,8 @@
 
 Renal impairment can significantly change how drugs are handled by the body. 
 For some medicines, reduced kidney function may require a lower dose, a longer dosing interval, additional monitoring, or even avoiding the drug. 
-In everyday clinical work, this information is usually checked manually in Summary of Product Characteristics .
+In everyday clinical work, this information is usually checked manually in the Summary of Product Characteristics (SmPC) of each medicine%
+\footnote{In Poland, the SmPC is known as \textit{Charakterystyka Produktu Leczniczego} (ChPL).}.
 
 These documents are official and reliable, but they are not convenient for automatic use. 
 They are usually available as PDF files, and relevant information may be spread across different sections, such as dosage, contraindications, warnings, and pharmacokinetics. 
@@ -88,9 +89,7 @@ AI may be used as a \textbf{helper} for extracting candidate rules from ChPL doc
 
 \section{Problem Statement}\label{sec:problem-statement}
 
-Information about renal dose adjustment is available in official Summary of Product Characteristics%
-\footnote{In Poland, the Summary of Product Characteristics is known as \textit{Charakterystyka Produktu Leczniczego} (ChPL). It is an official document describing the approved conditions of use of a medicinal product, including dosage, contraindications, warnings, and pharmacological properties.}, 
-but it is not provided in a structured form suitable for automatic decision support.
+Information about renal dose adjustment is available in official SmPC documents, but it is not provided in a structured form suitable for automatic decision support.
 
 For each drug, the relevant information may appear in different sections of the document, including dosage, contraindications, warnings, and pharmacokinetic properties. 
 Moreover, recommendations may depend on the route of administration, pharmaceutical form, renal function threshold, or the presence of severe renal impairment.
@@ -126,7 +125,7 @@ It is not intended for real clinical use, does not replace the judgement of a ph
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Background}
+\chapter{Background}\label{ch:background}
 \section{Renal Dose Adjustment}
 \label{sec:renal-dose-adjustment}
 
@@ -173,6 +172,7 @@ Both equations use serum creatinine in \(\mathrm{mg/dL}\). A concentration repor
 
 \paragraph{Relevance to dosing.}
 When filtration declines, a drug that depends substantially on glomerular filtration for elimination may accumulate if the same dose is repeated at the same interval~\cite{artDooguePolasek2011DrugDosingRenalDisease}.
+Clinical practice guidelines therefore recommend considering GFR when dosing medications cleared by the kidneys~\cite{artKDIGO2024CKD}.
 The product information links a renal function range to a dosing instruction, so the choice of estimate matters particularly near a threshold~\cite{artStevens2009DrugDosingRecommendations,artHudsonNolin2018KidneyFunctionDrugDosing}.
 For example, when a rule specifies Cockcroft--Gault CrCl in \(\mathrm{mL/min}\), comparing its threshold directly with an indexed CKD-EPI value would change both the quantity and the units being compared.
 RenalSafe therefore records the required metric with each rule and requests manual review when that estimate is unavailable.
@@ -300,15 +300,15 @@ This design keeps the most safety-critical part of the system deterministic, exp
 It also fits the engineering scope of the thesis: the objective is not to train a new clinical model, but to build a prototype that transforms official drug information into a structured knowledge base and applies it through a transparent decision process.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Requirements and Dataset}
-\section{Functional Requirements}
-\section{Non-Functional Requirements}
-\section{Selected Drug Groups}
-\section{Source Documents and Manual Rule Preparation}
+\chapter{Requirements and Dataset}\label{ch:requirements}
+\section{Functional Requirements}\label{sec:functional-requirements}
+\section{Non-Functional Requirements}\label{sec:non-functional-requirements}
+\section{Selected Drug Groups}\label{sec:selected-drug-groups}
+\section{Source Documents and Manual Rule Preparation}\label{sec:source-documents}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{System Design}
+\chapter{System Design}\label{ch:design}
 \section{General System Architecture}
 \label{sec:general-system-architecture}
 
@@ -410,11 +410,11 @@ The case history also supports recalculation after a laboratory correction.
 For example, if a transcription error is discovered, the physician records a replacement observation and can use it in a new assessment linked to the earlier one.
 Both results remain available for comparison, each with the measurement and rules used at the time.
 
-\section{AI-Assisted Rule Extraction Workflow}
+\section{AI-Assisted Rule Extraction Workflow}\label{sec:ai-extraction-workflow}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{Implementation}
+\chapter{Implementation}\label{ch:implementation}
 \section{Technology Stack}
 \label{sec:technology-stack}
 
@@ -544,40 +544,32 @@ The byte offsets allow a passage to be checked by taking the corresponding slice
 When a reviewer later saves a candidate rule, the quotation must occur exactly once in the selected passage.
 Counting page breaks before that occurrence gives the physical page on which the quotation starts, completing the link from the rule to the PDF shown in Figure~\ref{fig:knowledge-base-schema}.
 
-\section{User Interface}
+\section{User Interface}\label{sec:user-interface}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Testing and Evaluation}
-\section{Testing Strategy}
-\section{Synthetic Patient Cases}
-\section{Evaluation of Rule Matching}
-\section{Example Recommendations}
+\chapter{Testing and Evaluation}\label{ch:testing}
+\section{Testing Strategy}\label{sec:testing-strategy}
+\section{Synthetic Patient Cases}\label{sec:synthetic-patient-cases}
+\section{Evaluation of Rule Matching}\label{sec:rule-matching-evaluation}
+\section{Example Recommendations}\label{sec:example-recommendations}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{Conclusions}
-\section{Summary of Results}
-\section{Limitations}
+\chapter{Conclusions}\label{ch:conclusions}
+\section{Summary of Results}\label{sec:summary-results}
+\section{Limitations}\label{sec:limitations}
 
-The prototype is limited to a selected set of drugs and manually validated rules.
-It does not cover all medicines available in clinical practice and does not attempt
-to replace full pharmaceutical review.
-The system uses synthetic patient cases and is not integrated with hospital
-information systems or electronic health records. Therefore, the evaluation is
-technical and functional rather than clinical.
-The system relies on information extracted from ChPL documents. Although
-these documents are official sources, their structure is not always convenient for
-automatic processing, especially when information is provided as free text or
-tables.
-AI-assisted extraction, if used, is treated only as a support mechanism. Can-
-didate rules requires clinical validation before they can be used by the recommendation engine.
-\section{Future Work}
+The prototype is limited to a selected set of drugs and to rules that were prepared and reviewed manually.
+It does not cover all medicines available in clinical practice and does not attempt to replace full pharmaceutical review.
+The system uses synthetic patient cases and is not integrated with hospital information systems or electronic health records.
+Therefore, the evaluation is technical and functional rather than clinical.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{Discussion}\label{ch:disco}
+The system relies on information extracted from SmPC documents.
+Although these documents are official sources, their structure is not always convenient for automatic processing, especially when information is provided as free text or tables.
+AI-assisted extraction is treated only as a support mechanism, and candidate rules require pharmacist review before they can be used by the recommendation engine.
 
-A well written thesis should contain a well written discussion of the results obtained, with references to the exiting literature as well as to the aim of the thesis.
+\section{Future Work}\label{sec:future-work}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
