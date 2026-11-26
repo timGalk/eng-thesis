@@ -502,7 +502,53 @@ With input bounds of \(0.9\) and \(1.1\,\mathrm{mg/dL}\), the corresponding clea
 The calculator passes the unrounded values to the decision engine for the interval check described in Section~\ref{sec:decision-models}.
 
 \section{Rule-Based Recommendation Engine}
+\label{sec:recommendation-engine}
+
+The Go function \texttt{decision.Assess} implements the matching procedure described in Section~\ref{sec:decision-models}.
+It accepts a request and a validated knowledge snapshot, calls the renal calculator once, and constructs one result for each medication in request order.
+Each result starts with the status \texttt{MANUAL\_REVIEW\_REQUIRED}.
+If a check fails, the function appends the reason to that result and continues with the next medication.
+For instance, when the required estimate is unavailable, the result includes the calculator's warnings as well as the reason that matching stopped.
+This lets the caller distinguish a missing weight measurement from a gap in the approved rules.
+
+For each medication, the function scans the snapshot for approved rules whose product, route, form, and indication match the request exactly.
+It collects the distinct renal metrics used by those rules before comparing any values.
+Even if the calculator produced both estimates, the engine requests review when the eligible rules specify different metrics.
+Once it has identified a single metric, it uses the interval method \texttt{Contains} to compare its unrounded point estimate against each rule's lower and upper bounds, including or excluding each endpoint as specified.
+After finding a unique point match, the engine checks the approval date, any age or weight conditions, and whether the same interval contains both bounds returned by the calculator.
+
+Only after these checks succeed does the function set \texttt{RULE\_MATCHED} and copy the action and any dosing instructions from the rule.
+It builds the explanation from the selected estimate, rule identifier and version, and the cited SmPC section, page, and quotation.
+When the request includes a proposed prescription, its medication index identifies the result to which the separate prescription check belongs.
+For a rule with explicit regimen limits, the comparison tests whether the single dose exceeds the stored maximum or the interval falls below the stored minimum.
+Equality at either limit is allowed. A difference in dose units requires manual review, even when the rule itself matched.
+The saved assessment includes the engine and calculator policy versions, together with the knowledge version and digest, so the inputs to a later replay can be identified.
+
 \section{Document Processing Module}
+\label{sec:document-processing}
+
+The document processing module turns an uploaded SmPC into passages that a reviewer can trace back to the original PDF.
+The upload contains the PDF and metadata identifying the medication context, source URL, document version, and first and last physical pages for that product.
+The page range matters when one PDF contains information for several products because a heading such as SmPC section~4.2 can occur more than once.
+
+The Go service passes the PDF bytes to Poppler's \texttt{pdftotext} utility, requesting UTF-8 text with the page layout retained.
+The extractor accepts PDFs up to 12~MiB, limits extracted output to 16~MiB, and sets a 30-second timeout.
+If a scan produces too little text, the import fails and requires manual preparation or optical character recognition before it can proceed.
+For a successful extraction, the parser uses the page-break characters in the text to locate the declared page range.
+Within that range, it looks for numbered headings 4.1--4.9, 5.1, and 5.2.
+Each section records its physical page range and its starting and ending byte offsets in the full extracted text.
+
+Long sections are split at paragraph boundaries with a target of 6000~bytes per passage.
+Dosing tables need special care because a row can depend on a unit in the heading or a qualification in a footnote.
+The splitter uses aligned whitespace to identify possible table blocks and groups them with adjacent paragraphs before choosing a split point.
+An indivisible block can therefore exceed the target length.
+This heuristic preserves surrounding text for inspection. Interpreting a column or verifying what a footnote qualifies remains a review task.
+
+During import, the store computes separate SHA-256 digests for the PDF and extracted text and writes the document, passages, knowledge revision update, and audit event in one transaction.
+The byte offsets allow a passage to be checked by taking the corresponding slice of the stored UTF-8 text, including Polish characters that occupy more than one byte.
+When a reviewer later saves a candidate rule, the quotation must occur exactly once in the selected passage.
+Counting page breaks before that occurrence gives the physical page on which the quotation starts, completing the link from the rule to the PDF shown in Figure~\ref{fig:knowledge-base-schema}.
+
 \section{User Interface}
 
 
