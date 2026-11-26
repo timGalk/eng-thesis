@@ -192,7 +192,7 @@ The Cockcroft--Gault equation estimates CrCl in \(\mathrm{mL/min}\) as
     \mathrm{CrCl} = \frac{(140-A)\,W}{72\,\mathrm{SCr}}\,c ,
     \label{eq:cockcroft-gault}
 \end{equation}
-where \(W\) is body weight in kilograms and \(c\) is \(0.85\) for females and \(1\) for males~\cite{artCockcroftGault1976}.
+where \(W\) is body weight in kilograms and \(c\) is \(1\) for males and \(0.85\) for females, following the authors' suggestion that the value be 15\% lower in females~\cite{artCockcroftGault1976}.
 Both equations use serum creatinine in \(\mathrm{mg/dL}\). A concentration reported in \(\mu\mathrm{mol/L}\) is converted by dividing its numerical value by \(88.4\)~\cite{artStevens2009DrugDosingRecommendations}.
 
 \paragraph{Relevance to dosing.}
@@ -241,7 +241,7 @@ The system receives basic patient parameters and a medication list, calculates r
 For each medication, the output is either the action recorded in the matched rule, namely \textit{no change}, \textit{reduce dose}, \textit{extend interval}, \textit{use with caution}, or \textit{avoid}, or the status \textit{manual review required}.
 
 Renal dosing is a suitable use case for decision support, because several studies have shown that inappropriate dosing is common in patients with reduced kidney function~\cite{artChertow2001GuidedMedicationDosing,artTerrell2010CDSSRenalDosing}.
-Computerized dosing support was also shown to improve the appropriateness of prescriptions for patients with renal insufficiency in selected clinical settings~\cite{artChertow2001GuidedMedicationDosing,artTerrell2010CDSSRenalDosing}. 
+Computerized dosing support was also shown to improve the appropriateness of dose and dosing frequency for hospital inpatients with renal insufficiency~\cite{artChertow2001GuidedMedicationDosing} and to reduce excessive dosing in prescriptions issued at emergency department discharge~\cite{artTerrell2010CDSSRenalDosing}.
 These findings give a practical motivation for building a prototype that applies renal dosing rules in a structured and traceable way.
 
 CDSS implementations can be described using several practical distinctions. 
@@ -263,7 +263,7 @@ Another important design issue is the risk of non-actionable or excessive alerts
 Drug safety alerts are frequently overridden in clinical practice, and high override rates have been reported in computerized physician order entry systems~\cite{artVanderSijs2006Override}. 
 For this reason, the prototype follows a conservative answering policy: when it cannot identify a single applicable approved rule, it returns \textit{manual review required} instead of inferring a recommendation.
 Section~\ref{sec:decision-models} defines the conditions under which this status is returned.
-This behaviour is consistent with the principle that decision support should be actionable, transparent, and fitted to the user's workflow~\cite{artBates2003TenCommandments}.
+This behaviour is consistent with the principles that decision support should fit into the user's workflow and should propose an alternative action rather than merely advise against one~\cite{artBates2003TenCommandments}.
 
 \section{Healthcare Data Platforms and Polish E-Health Context}
 \label{sec:healthcare-data-platforms}
@@ -283,7 +283,7 @@ For example, the HL7 FHIR Clinical Reasoning module describes how clinical knowl
 This shows that decision support is not only a matter of implementing algorithms, but also of organizing knowledge, data, and workflow integration.
 
 A comparable digital transformation can be observed in the Polish healthcare system. 
-The national e-health system, known as P1, provides digital services such as electronic prescriptions, electronic referrals, electronic medical documentation, medical events, e-registration, the Internet Patient Account, the mojeIKP application, and gabinet.gov.pl~\cite{miscEZdrowieP1}. 
+The national e-health system, known as P1, provides digital services, such as electronic prescriptions, electronic referrals, electronic medical documentation, medical events, and e-registration, as well as applications, namely the Internet Patient Account, mojeIKP, and gabinet.gov.pl~\cite{miscEZdrowieP1}.
 These services support patients, medical professionals, healthcare providers, and public administration, showing that healthcare in Poland is increasingly based on structured digital data exchange.
 
 The prototype developed in this thesis is not integrated with national e-health infrastructure and does not process real patient data. 
@@ -322,7 +322,8 @@ Recent work on large language models for drug-label and drug-safety information 
 In the proposed architecture, AI-generated outputs are therefore treated only as candidate rules. 
 They are stored with a pending review status and cannot be used by the recommendation engine until a pharmacist reviews and approves them.
 This separation is important because large language models may misinterpret source text, omit conditions, confuse units, or overinterpret ambiguous information. 
-Reviews of large language models in medicine emphasize that, although these systems may be useful in clinical and biomedical workflows, reliability, hallucination risk, and human oversight remain important concerns~\cite{artJung2025LLMsMedicine,artAsgari2025LLMHallucinationSafety}.
+A recent review of large language models in medicine emphasizes that, although these systems may be useful in clinical workflows, reliability, hallucination risk, and human oversight remain important concerns~\cite{artJung2025LLMsMedicine}.
+An evaluation of LLM-generated clinical notes also shows that hallucinations and omissions occur and must be assessed for their clinical impact~\cite{artAsgari2025LLMHallucinationSafety}.
 
 The final decision workflow is therefore hybrid but conservative. 
 AI may support document processing, while the actual recommendation is generated only from approved structured rules.
