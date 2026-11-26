@@ -168,7 +168,7 @@ Together, these processes allow the kidneys to remove waste while regulating the
 The glomerular filtration rate (GFR) is the volume of filtrate formed by all functioning glomeruli per unit time.
 In routine practice, a blood sample can be used to estimate this rate from the serum concentration of creatinine, a waste product of muscle metabolism.
 With stable creatinine production and kidney function, a lower filtration rate generally corresponds to a higher serum creatinine concentration.
-Muscle mass and tubular secretion also influence that concentration, so two people with the same serum creatinine can have different filtration rates~\cite{miscNIDDKDrugDosing}.
+Muscle mass and tubular secretion also influence that concentration, so two people with the same serum creatinine can have different filtration rates~\cite{miscNIDDKDrugDosing,miscNKFGFRFAQ}.
 The term \emph{estimated GFR} (eGFR) refers to the result of an estimating equation.
 
 \paragraph{The two estimates used in RenalSafe.}
@@ -186,19 +186,19 @@ Indexing to this reference surface area allows filtration estimates to be compar
 
 Some prescribing information specifies thresholds in terms of estimated creatinine clearance (CrCl)~\cite{artDowling2010RenalDrugDosing,artJones2011RenalFunctionDrugDosing}.
 Creatinine clearance is the volume of plasma from which the kidneys clear creatinine per unit time.
-Because the tubules secrete some creatinine in addition to the amount filtered at the glomerulus, creatinine clearance can exceed GFR~\cite{artJones2011RenalFunctionDrugDosing}.
+Because the tubules secrete some creatinine in addition to the amount filtered at the glomerulus, creatinine clearance can exceed GFR~\cite{artStefani2019AdjustDrugDosesCKD,artStevens2009DrugDosingRecommendations}.
 The Cockcroft--Gault equation estimates CrCl in \(\mathrm{mL/min}\) as
 \begin{equation}
     \mathrm{CrCl} = \frac{(140-A)\,W}{72\,\mathrm{SCr}}\,c ,
     \label{eq:cockcroft-gault}
 \end{equation}
 where \(W\) is body weight in kilograms and \(c\) is \(0.85\) for females and \(1\) for males~\cite{artCockcroftGault1976}.
-Both equations use serum creatinine in \(\mathrm{mg/dL}\). A concentration reported in \(\mu\mathrm{mol/L}\) is converted by dividing its numerical value by \(88.4\).
+Both equations use serum creatinine in \(\mathrm{mg/dL}\). A concentration reported in \(\mu\mathrm{mol/L}\) is converted by dividing its numerical value by \(88.4\)~\cite{artStevens2009DrugDosingRecommendations}.
 
 \paragraph{Relevance to dosing.}
 When filtration declines, a drug that depends substantially on glomerular filtration for elimination may accumulate if the same dose is repeated at the same interval~\cite{artDooguePolasek2011DrugDosingRenalDisease}.
-Clinical practice guidelines therefore recommend considering GFR when dosing medications cleared by the kidneys~\cite{artKDIGO2024CKD}.
-The product information links a renal function range to a dosing instruction, so the choice of estimate matters particularly near a threshold~\cite{artStevens2009DrugDosingRecommendations,artHudsonNolin2018KidneyFunctionDrugDosing}.
+The KDIGO 2024 guideline therefore advises clinicians to consider GFR when dosing medications cleared by the kidneys~\cite{artKDIGO2024CKD}.
+The product information links a renal function range to a dosing instruction, so the choice of estimate matters particularly near a threshold~\cite{artStevens2009DrugDosingRecommendations,artHudsonNolin2018KidneyFunctionDrugDosing,artDooguePolasek2011DrugDosingRenalDisease}.
 For example, when a rule specifies Cockcroft--Gault CrCl in \(\mathrm{mL/min}\), comparing its threshold directly with an indexed CKD-EPI value would change both the quantity and the units being compared.
 RenalSafe therefore records the required metric with each rule and requests manual review when that estimate is unavailable.
 Section~\ref{sec:decision-models} describes how the decision engine selects the estimate required by each rule, and Section~\ref{sec:renal-function-calculator} describes how both equations are implemented.
@@ -211,7 +211,7 @@ According to the European Medicines Agency, the SmPC is the basis of information
 For this reason, SmPC documents are a natural source of knowledge for a system that supports drug dosing decisions.
 
 The structure of an SmPC is standardized. 
-For renal dose adjustment, the most relevant parts are usually section 4.2, which describes posology and method of administration, section 4.3, which lists contraindications, section 4.4, which contains special warnings and precautions, and section 5.2, which describes pharmacokinetic properties. 
+For renal dose adjustment, the most relevant parts are usually section 4.2, which describes posology and method of administration, section 4.3, which lists contraindications, section 4.4, which contains special warnings and precautions for use, and section 5.2, which describes pharmacokinetic properties~\cite{miscEuropeanCommissionSmPCGuideline}.
 The European Commission guideline on SmPC presentation describes the expected structure and principles for presenting information in these documents~\cite{miscEuropeanCommissionSmPCGuideline}. 
 In practice, renal impairment may be mentioned in more than one section, for example as a precise dose adjustment table in section 4.2, as a warning in section 4.4, or as information about renal elimination in section 5.2.
 
@@ -233,21 +233,21 @@ Section~\ref{sec:knowledge-base-design} describes how this representation is sto
 
 \section{Clinical Decision Support Systems}\label{sec:cdss}
 
-A clinical decision support system (CDSS) is a type of healthcare software that combines patient-specific information with medical knowledge in order to support clinical decision-making~\cite{artBates2003TenCommandments}. 
+A clinical decision support system (CDSS) is a type of healthcare software that combines patient-specific information with medical knowledge in order to support clinical decision-making~\cite{artSutton2020CDSSOverview}.
 In contrast to general healthcare data platforms, a CDSS is not mainly focused on storing or moving data, but on interpreting it in a specific clinical context and returning an output that can be used by the clinician.
 
 In this thesis, the supported clinical decision is limited to renal dose adjustment. 
 The system receives basic patient parameters and a medication list, calculates renal function, and compares the result with approved dosing rules derived from SmPC documents.
 For each medication, the output is either the action recorded in the matched rule, namely \textit{no change}, \textit{reduce dose}, \textit{extend interval}, \textit{use with caution}, or \textit{avoid}, or the status \textit{manual review required}.
 
-Renal dosing is a suitable use case for decision support, because several studies have shown that inappropriate dosing is common in patients with reduced kidney function~\cite{artDowling2010RenalDrugDosing,artStevens2009DrugDosingRecommendations}. 
+Renal dosing is a suitable use case for decision support, because several studies have shown that inappropriate dosing is common in patients with reduced kidney function~\cite{artChertow2001GuidedMedicationDosing,artTerrell2010CDSSRenalDosing}.
 Computerized dosing support was also shown to improve the appropriateness of prescriptions for patients with renal insufficiency in selected clinical settings~\cite{artChertow2001GuidedMedicationDosing,artTerrell2010CDSSRenalDosing}. 
 These findings give a practical motivation for building a prototype that applies renal dosing rules in a structured and traceable way.
 
 CDSS implementations can be described using several practical distinctions. 
-A system may be \textit{active} or \textit{passive}, depending on whether it automatically generates alerts or responds only to an explicit user request. 
+A system may be \textit{active} or \textit{passive}, depending on whether it automatically generates alerts or responds only to an explicit user request~\cite{artSutton2020CDSSOverview}.
 It may also be \textit{embedded} into an electronic health record workflow or operate as a \textit{standalone} tool. 
-Finally, it may be \textit{knowledge-driven}, using explicitly encoded knowledge such as rules, or \textit{data-driven}, using models trained on historical data.
+Finally, it may be \textit{knowledge-driven}, using explicitly encoded knowledge such as rules, or \textit{data-driven}, using models trained on historical data~\cite{artSutton2020CDSSOverview}.
 
 The prototype developed in this thesis is intentionally designed as a passive, standalone, knowledge-driven system. 
 It is passive because the physician explicitly enters patient data and asks for a recommendation. 
