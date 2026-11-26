@@ -80,7 +80,7 @@ This thesis presents the design and implementation of RenalSafe, a prototype cli
 The system uses structured rules derived from SmPC documents and applies them to basic patient data and a medication list.
 
 The main goal is to generate explainable recommendations based on approved rules.
-For each drug, the system should indicate whether the dose can remain unchanged, whether the dose should be reduced or the dosing interval extended, whether the drug should be used with caution or avoided, or whether manual review is required.
+For each drug, the system should return one of the following outcomes: no change, a reduced dose, an extended dosing interval, use with caution, avoidance, or manual review.
 Each recommendation should also point to the source document and section from which the rule was derived.
 The goal is divided into the following objectives:
 \begin{enumerate}[label=O\arabic*.,ref=O\arabic*]
@@ -90,8 +90,6 @@ The goal is divided into the following objectives:
     \item\label{obj:ai-extraction} Support rule preparation with optional AI-assisted extraction of candidate rules, which a pharmacist must review before approval.
     \item\label{obj:prototype} Deliver these functions as a working web application tested on synthetic patient cases.
 \end{enumerate}
-
-The final recommendation is produced by a deterministic rule-based engine, and AI does not decide it, as stated in Section~\ref{sec:project-assumptions}.
 
 
 \section{Problem Statement}\label{sec:problem-statement}
@@ -125,7 +123,7 @@ The prototype is not connected to hospital systems, electronic health records, o
 Patient parameters are entered manually in order to test the decision workflow in a controlled environment.
 
 Fifth, the system assumes that renal dose adjustment can be represented as structured rules based on renal function thresholds, recommendation types, and source references.
-Cases that these rules do not cover are handled by the manual-review policy stated in Section~\ref{sec:problem-statement}.
+When no rule covers a case, the system requests manual review.
 
 Sixth, the prototype distinguishes two clinical user roles.
 A physician enters patient data and requests assessments, while a pharmacist reviews candidate rules and approves them for use by the recommendation engine.
@@ -146,10 +144,7 @@ Chapter~\ref{ch:conclusions} summarizes the results with respect to the objectiv
 
 \chapter{Background}\label{ch:background}
 
-This chapter introduces the clinical and technical background of the system outlined in Chapter~\ref{ch:intro}.
-Section~\ref{sec:renal-dose-adjustment} explains how renal function is estimated and why the estimate affects dosing.
-Section~\ref{sec:smpc-data-source} describes the SmPC as the source of dosing rules.
-Sections~\ref{sec:cdss}--\ref{sec:rule-ai-decision-support} place the system among clinical decision support systems and healthcare data platforms and justify the division of work between rules and AI.
+This chapter introduces the clinical and technical background on which the design of RenalSafe is based.
 
 \section{Renal Dose Adjustment}
 \label{sec:renal-dose-adjustment}
@@ -201,7 +196,6 @@ The KDIGO 2024 guideline therefore advises clinicians to consider GFR when dosin
 The product information links a renal function range to a dosing instruction, so the choice of estimate matters particularly near a threshold~\cite{artStevens2009DrugDosingRecommendations,artHudsonNolin2018KidneyFunctionDrugDosing,artDooguePolasek2011DrugDosingRenalDisease}.
 For example, when a rule specifies Cockcroft--Gault CrCl in \(\mathrm{mL/min}\), comparing its threshold directly with an indexed CKD-EPI value would change both the quantity and the units being compared.
 RenalSafe therefore records the required metric with each rule and requests manual review when that estimate is unavailable.
-Section~\ref{sec:decision-models} describes how the decision engine selects the estimate required by each rule, and Section~\ref{sec:renal-function-calculator} describes how both equations are implemented.
 
 \section{Summary of Product Characteristics as a Data Source}
 \label{sec:smpc-data-source}
@@ -229,7 +223,6 @@ For the prototype developed in this thesis, SmPC documents are treated as the pr
 The information extracted from them must first be transformed into a structured representation containing the product, pharmaceutical form, route of administration, indication, renal function metric, renal function range, recommended action, any patient conditions, the cited source passage, and review status.
 Only rules approved by a pharmacist are used by the recommendation engine.
 This approach keeps the final decision process traceable to official product information while still allowing the system to operate on structured data.
-Section~\ref{sec:knowledge-base-design} describes how this representation is stored.
 
 \section{Clinical Decision Support Systems}\label{sec:cdss}
 
@@ -253,16 +246,14 @@ The prototype developed in this thesis is intentionally designed as a passive, s
 It is passive because the physician explicitly enters patient data and asks for a recommendation. 
 It is standalone because it is not integrated with hospital information systems or electronic health records. 
 It is knowledge-driven because recommendations are generated by a deterministic rule-based engine using approved rules stored in the knowledge base, not by a model trained on historical clinical data.
-Section~\ref{sec:general-system-architecture} shows how these properties shape the architecture of the system.
 
 Explainability is an important requirement for this type of system. 
 A recommendation should show which rule was applied, which patient value matched the rule, and which source document supports the recommendation. 
-This requirement directly influences the data model: every renal dosing rule stored in the knowledge base contains a reference to the source document and to the section from which it was derived, as described in Section~\ref{sec:knowledge-base-design}.
+This requirement directly influences the data model: every renal dosing rule stored in the knowledge base contains a reference to the source document and to the section from which it was derived.
 
 Another important design issue is the risk of non-actionable or excessive alerts. 
 Drug safety alerts are frequently overridden in clinical practice, and high override rates have been reported in computerized physician order entry systems~\cite{artVanderSijs2006Override}. 
 For this reason, the prototype follows a conservative answering policy: when it cannot identify a single applicable approved rule, it returns \textit{manual review required} instead of inferring a recommendation.
-Section~\ref{sec:decision-models} defines the conditions under which this status is returned.
 This behaviour is consistent with the principles that decision support should fit into the user's workflow and should propose an alternative action rather than merely advise against one~\cite{artBates2003TenCommandments}.
 
 \section{Healthcare Data Platforms and Polish E-Health Context}
@@ -283,14 +274,13 @@ For example, the HL7 FHIR Clinical Reasoning module describes how clinical knowl
 This shows that decision support is not only a matter of implementing algorithms, but also of organizing knowledge, data, and workflow integration.
 
 A comparable digital transformation can be observed in the Polish healthcare system. 
-The national e-health system, known as P1, provides digital services, such as electronic prescriptions, electronic referrals, electronic medical documentation, medical events, and e-registration, as well as applications, namely the Internet Patient Account, mojeIKP, and gabinet.gov.pl~\cite{miscEZdrowieP1}.
+The national e-health system, known as P1, provides digital services, including electronic prescriptions, referrals, medical documentation, medical events, and e-registration, and applications such as the Internet Patient Account, mojeIKP, and gabinet.gov.pl~\cite{miscEZdrowieP1}.
 These services support patients, medical professionals, healthcare providers, and public administration, showing that healthcare in Poland is increasingly based on structured digital data exchange.
 
 The prototype developed in this thesis is not integrated with national e-health infrastructure and does not process real patient data. 
 However, its internal architecture follows a simplified version of the same general idea. 
 Drug information is imported from official source documents, transformed into structured rules, stored in a knowledge base, and then used by a decision engine to generate explainable recommendations. 
 In this sense, the system can be treated as a small domain-specific decision support platform focused only on renal dose adjustment.
-The architecture presented in Section~\ref{sec:general-system-architecture} follows this flow.
 
 
 \section{Rule-Based and AI-Assisted Decision Support}
@@ -329,14 +319,11 @@ The final decision workflow is therefore hybrid but conservative.
 AI may support document processing, while the actual recommendation is generated only from approved structured rules.
 This design keeps the most safety-critical part of the system deterministic, explainable, and auditable.
 It also fits the engineering scope of the thesis: the objective is not to train a new clinical model, but to build a prototype that transforms official drug information into a structured knowledge base and applies it through a transparent decision process.
-Section~\ref{sec:general-system-architecture} shows how this separation is reflected in the architecture, and Section~\ref{sec:decision-models} defines the matching procedure.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \chapter{Requirements and Dataset}\label{ch:requirements}
 
-This chapter translates the objectives in Section~\ref{sec:goal-thesis} and the assumptions in Section~\ref{sec:project-assumptions} into requirements for the prototype.
-It also describes the drugs selected for the prototype and the preparation of rules from their SmPC documents.
-The design in Chapter~\ref{ch:design} is derived from these requirements, and the tests in Chapter~\ref{ch:testing} check them.
+This chapter specifies the requirements of the prototype and describes the drugs and source documents used to prepare its rules.
 
 \section{Functional Requirements}\label{sec:functional-requirements}
 \section{Non-Functional Requirements}\label{sec:non-functional-requirements}
@@ -347,15 +334,12 @@ The design in Chapter~\ref{ch:design} is derived from these requirements, and th
 
 \chapter{System Design}\label{ch:design}
 
-This chapter describes the design of RenalSafe, based on the background in Chapter~\ref{ch:background} and the requirements in Chapter~\ref{ch:requirements}.
-Section~\ref{sec:general-system-architecture} presents the components of the system.
-Sections~\ref{sec:decision-models} and~\ref{sec:knowledge-base-design} define how rules are evaluated and stored, and the remaining sections describe the workflows through which users create assessments and prepare rules.
-Chapter~\ref{ch:implementation} then describes how this design is implemented.
+This chapter describes the architecture of RenalSafe, its decision model and knowledge base, and the workflows for assessments and rule extraction.
 
 \section{General System Architecture}
 \label{sec:general-system-architecture}
 
-Consistent with the passive, standalone, and knowledge-driven design described in Section~\ref{sec:cdss}, RenalSafe is implemented as a web application with three main components: a browser-based user interface, an application backend, and a relational database.
+RenalSafe is implemented as a standalone web application with three main components: a browser-based user interface, an application backend, and a relational database.
 The interface is developed in React and TypeScript, while the backend is written in Go.
 The Go service exposes a REST API and serves the compiled interface, so the browser communicates with a single application service.
 PostgreSQL with the pgvector extension stores source documents, structured rules, synthetic patient records, assessment results, and audit events.
@@ -372,13 +356,13 @@ Figure~\ref{fig:renalsafe-architecture} shows how the Go service connects the br
 The backend separates renal function calculation, rule matching, document processing, and persistence into distinct modules within one application.
 The renal calculator derives estimates from the supplied patient parameters.
 The decision engine evaluates approved rules against the medication context and the renal function metric required by each rule.
-A successful match returns the rule's recommendation and source reference; missing information or the absence of a unique applicable rule results in a manual-review status, as defined in Section~\ref{sec:decision-models}.
+A successful match returns the rule's recommendation and source reference; missing information or the absence of a unique applicable rule results in a manual-review status.
 The engine does not call a language model, and its explanations are constructed from the calculation, matched rule, and supporting source evidence.
 
 Knowledge preparation follows a separate workflow within the same service.
 PDF text is extracted using Poppler, and candidate rules can be prepared manually or suggested by an optional language-model provider.
 Model-assisted extraction is handled by a background worker in the Go application.
-Suggestions must be explicitly saved as pending candidates and reviewed by a pharmacist before they can be approved for use by the decision engine, following the hybrid approach described in Section~\ref{sec:rule-ai-decision-support}.
+Suggestions must be explicitly saved as pending candidates and reviewed by a pharmacist before they can be approved for use by the decision engine.
 This separation allows assessments based on existing approved rules to operate without the model provider.
 
 The local deployment consists of an application container and a database container managed by Docker Compose.
@@ -397,13 +381,12 @@ These rules must specify a single renal metric. The engine compares the unrounde
 Exactly one interval must contain the estimate. The rule's approval must also be effective at the assessment time, and the patient must satisfy any age or weight conditions recorded in the rule.
 If any of these checks fails, the result identifies the reason for manual review and contains no dosing action.
 
-The distinction between a point estimate and a range matters near a threshold, where the choice of estimate is also most important (Section~\ref{sec:renal-dose-adjustment}). In a synthetic software test, two creatinine clearance rules cover \([0,30)\) and \([30,\infty)\) in \(\mathrm{mL/min}\). A value of exactly \(30\) matches the second rule.
+The distinction between a point estimate and a range matters near a threshold. In a synthetic software test, two creatinine clearance rules cover \([0,30)\) and \([30,\infty)\) in \(\mathrm{mL/min}\). A value of exactly \(30\) matches the second rule.
 If the request also supplies lower and upper bounds for serum creatinine, the calculator propagates both through the equation. When the resulting clearance interval extends across the threshold, the engine returns manual review even though the point estimate alone matches one rule.
 
 A successful match returns the action recorded in the rule (\textit{no change}, \textit{reduce dose}, \textit{extend interval}, \textit{use with caution}, or \textit{avoid}), together with its source citation and any dosing instructions stored in the rule.
 Checking a proposed prescription is a separate, optional decision. For an avoidance rule, the engine flags the proposed use as outside the rule limits. For other actions, it can compare the entered single dose and dosing interval with an explicit maximum single dose and minimum interval.
 If those limits are absent or the dose units differ, the prescription check requires manual review. The user can therefore see which adjustment rule applies even when the system cannot assess the proposed regimen.
-Section~\ref{sec:recommendation-engine} describes the implementation of this procedure.
 
 \section{Knowledge Base Design}
 \label{sec:knowledge-base-design}
@@ -462,8 +445,7 @@ Both results remain available for comparison, each with the measurement and rule
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Implementation}\label{ch:implementation}
 
-This chapter describes how the design presented in Chapter~\ref{ch:design} is implemented.
-Section~\ref{sec:technology-stack} introduces the technologies used, and the following sections describe the backend, the renal function calculator, the recommendation engine, the document processing module, and the user interface.
+This chapter describes how the design is implemented, from the technology stack to the user interface.
 
 \section{Technology Stack}
 \label{sec:technology-stack}
@@ -601,8 +583,7 @@ Counting page breaks before that occurrence gives the physical page on which the
 
 \chapter{Testing and Evaluation}\label{ch:testing}
 
-This chapter evaluates whether the implementation described in Chapter~\ref{ch:implementation} meets the requirements stated in Chapter~\ref{ch:requirements}.
-Because the prototype works with synthetic patient data only (Section~\ref{sec:project-assumptions}), the evaluation is technical and functional and is based on software tests and synthetic patient cases.
+Because the prototype works with synthetic patient data only, the evaluation in this chapter is technical and functional and is based on software tests and synthetic patient cases.
 
 \section{Testing Strategy}\label{sec:testing-strategy}
 \section{Synthetic Patient Cases}\label{sec:synthetic-patient-cases}
@@ -612,7 +593,7 @@ Because the prototype works with synthetic patient data only (Section~\ref{sec:p
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Conclusions}\label{ch:conclusions}
 
-This chapter summarizes the results with respect to the objectives in Section~\ref{sec:goal-thesis}, describes the limitations of the prototype, and outlines directions for future work.
+This chapter summarizes the results with respect to the objectives in Section~\ref{sec:goal-thesis}, describes the limitations of the prototype, and outlines future work.
 
 \section{Summary of Results}\label{sec:summary-results}
 \section{Limitations}\label{sec:limitations}
