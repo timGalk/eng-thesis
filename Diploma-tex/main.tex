@@ -277,16 +277,11 @@ Second, rule-based decisions are easier to test and explain than black-box model
 Third, every recommendation can be traced back to a specific source document and section. 
 This is important in a medical-informatics system, where the user should be able to understand why a recommendation was returned and which source supports it.
 
-A simplified renal dosing rule can be represented as:
-
-\begin{equation}
-R = (d, r, m, [a,b), t, s)
-\end{equation}
-
-where \(d\) is the drug product, \(r\) is the route of administration, \(m\) is the renal function metric, \([a,b)\) is the renal function range, \(t\) is the recommendation type, and \(s\) is the source reference. 
-During recommendation generation, the decision engine checks whether the patient case matches the drug, route, and renal function range defined in the rule. 
-If a matching validated rule exists, the corresponding recommendation is returned. 
-If no validated rule matches, the system returns \textit{manual review required} instead of generating an unsupported recommendation.
+A dosing rule states when a recommendation applies.
+For example, a rule for a fictional intravenous medicine might read, \emph{If creatinine clearance is at least 30 but below 50~mL/min, give doses farther apart.}
+For that product, route, form, and indication, a clearance of 40~mL/min falls within the range, while 50~mL/min falls outside it.
+When exactly one approved rule applies, RenalSafe displays its recommendation and the passage in the product information that supports it.
+If the system cannot identify a single applicable rule, it displays \emph{manual review required}.
 
 Artificial intelligence can still be useful in this project, but its role is different. 
 ChPL documents are usually written as human-readable text and may contain tables, section references, and non-uniform wording. 
