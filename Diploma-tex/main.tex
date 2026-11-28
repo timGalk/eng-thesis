@@ -566,7 +566,7 @@ Table~\ref{tab:extraction-scoring-examples} shows recorded findings and how each
 
 \begin{table}[htbp]
     \centering
-    \caption[Examples of scored findings]{Examples of recorded findings and how they were scored. Rows 1--3, 5 and 6 come from GPT-5.4 mini and row 4 from Kimi K3.1 Pro. v1 and v2: whether the finding passes each validator; a response is accepted only if all its findings pass. Draft: whether the finding contains the renal interval and the dose or dosing interval needed for a rule draft.}
+    \caption[Examples of scored findings]{Examples of recorded findings and how they were scored. Rows 1--3, 5 and 6 come from GPT-5.4 mini and row 4 from Kimi K3.1 Pro. Rows 4 and 5 show two ways in which models returned the same range, printed in descending order. v1 and v2: whether the finding passes each validator; a response is accepted only if all its findings pass. Draft: whether the finding contains the renal interval and the dose or dosing interval needed for a rule draft.}
     \label{tab:extraction-scoring-examples}
     \small
     \begin{tabularx}{\linewidth}{@{}c>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{2.2cm}ccc@{}}
@@ -576,8 +576,8 @@ Table~\ref{tab:extraction-scoring-examples} shows recorded findings and how each
         1 & Meronem table: \emph{26-50 \ldots{} jedna dawka jednostkowa co 12 godzin} (one unit dose every 12 hours) & \mbox{26--50~ml/min} & yes & yes & yes \\
         2 & Biodacyna: \emph{klirensem kreatyniny} \(\geq\)\emph{50 ml/min \ldots{} 15 mg/kg mc./dobę} & \(\geq 50\)~ml/min & yes & yes & yes \\
         3 & Biodacyna: \emph{klirens kreatyniny jest mniejszy niż 50 ml/min} (is less than 50) & \(< 50\)~ml/min & no & yes & no \\
-        4 & Ceftazidime Kabi table: \emph{50-31} & \mbox{31--50~ml/min} & no & yes & yes \\
-        5 & Ceftazidime Kabi table: \emph{50-31} & from 50 to 31 & no & no & no \\
+        4 & Ceftazidime Kabi table: \emph{50-31} & lower 31, upper 50 & no & yes & yes \\
+        5 & Ceftazidime Kabi table: \emph{50-31} & lower 50, upper 31 & no & no & no \\
         6 & Tramadol Krka: \emph{należy rozważyć wydłużenie odstępów czasowych} (consider extending the dosing interval) & none & yes & yes & no \\
         \bottomrule
     \end{tabularx}
